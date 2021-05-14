@@ -21,6 +21,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
+	"net/http/pprof"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -94,6 +96,24 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+		mux.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("hello"))
+		})
+
+		if err := http.ListenAndServe("0.0.0.0:6060", mux); err != nil {
+			setupLog.Error(err, "failed to ListenAndServe")
+			os.Exit(1)
+		}
+	}()
 
 	// Add route Openshift scheme
 	if err := routev1.AddToScheme(scheme); err != nil {
