@@ -538,31 +538,37 @@ func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	customAllowlistPred := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			if e.Object.GetName() == config.AllowlistCustomConfigMapName &&
-				e.Object.GetNamespace() == config.GetDefaultNamespace() {
-				// generate the metrics allowlist configmap
-				log.Info("generate metric allow list configmap for custom configmap CREATE")
-				metricsAllowlistConfigMap, _ = generateMetricsListCM(c)
+				(e.Object.GetNamespace() == config.GetDefaultNamespace() || e.Object.GetLabels()["acm-observability"] == "true") {
+				if e.Object.GetNamespace() == config.GetDefaultNamespace() {
+					// generate the metrics allowlist configmap
+					log.Info("generate metric allow list configmap for custom configmap CREATE")
+					metricsAllowlistConfigMap, _ = generateMetricsListCM(c)
+				}
 				return true
 			}
 			return false
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			if e.ObjectNew.GetName() == config.AllowlistCustomConfigMapName &&
-				e.ObjectNew.GetNamespace() == config.GetDefaultNamespace() &&
+				(e.ObjectNew.GetNamespace() == config.GetDefaultNamespace() || e.ObjectNew.GetLabels()["acm-observability"] == "true") &&
 				e.ObjectNew.GetResourceVersion() != e.ObjectOld.GetResourceVersion() {
-				// regenerate the metrics allowlist configmap
-				log.Info("generate metric allow list configmap for custom configmap UPDATE")
-				metricsAllowlistConfigMap, _ = generateMetricsListCM(c)
+				if e.ObjectNew.GetNamespace() == config.GetDefaultNamespace() {
+					// regenerate the metrics allowlist configmap
+					log.Info("generate metric allow list configmap for custom configmap CREATE")
+					metricsAllowlistConfigMap, _ = generateMetricsListCM(c)
+				}
 				return true
 			}
 			return false
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			if e.Object.GetName() == config.AllowlistCustomConfigMapName &&
-				e.Object.GetNamespace() == config.GetDefaultNamespace() {
-				// regenerate the metrics allowlist configmap
-				log.Info("generate metric allow list configmap for custom configmap UPDATE")
-				metricsAllowlistConfigMap, _ = generateMetricsListCM(c)
+				(e.Object.GetNamespace() == config.GetDefaultNamespace() || e.Object.GetLabels()["acm-observability"] == "true") {
+				if e.Object.GetNamespace() == config.GetDefaultNamespace() {
+					// regenerate the metrics allowlist configmap
+					log.Info("generate metric allow list configmap for custom configmap CREATE")
+					metricsAllowlistConfigMap, _ = generateMetricsListCM(c)
+				}
 				return true
 			}
 			return false

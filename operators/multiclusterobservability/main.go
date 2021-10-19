@@ -174,6 +174,7 @@ func main() {
 		},
 		corev1.SchemeGroupVersion.WithKind("ConfigMap"): []filteredcache.Selector{
 			{FieldSelector: fmt.Sprintf("metadata.namespace==%s", config.GetDefaultNamespace())},
+			{LabelSelector: "acm-observability==true"},
 		},
 		corev1.SchemeGroupVersion.WithKind("Service"): []filteredcache.Selector{
 			{FieldSelector: fmt.Sprintf("metadata.namespace==%s", config.GetDefaultNamespace())},

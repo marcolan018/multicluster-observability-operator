@@ -42,6 +42,7 @@ var (
 	hubInfoSecret             *corev1.Secret
 	pullSecret                *corev1.Secret
 	managedClusterObsCert     *corev1.Secret
+	metricsAllowlist          *MetricsAllowlist
 	metricsAllowlistConfigMap *corev1.ConfigMap
 	amAccessorTokenSecret     *corev1.Secret
 
@@ -232,15 +233,6 @@ func generateGlobalManifestResources(c client.Client, mco *mcov1beta2.MultiClust
 	}
 	works = injectIntoWork(works, managedClusterObsCert)
 
-	// inject the metrics allowlist configmap
-	if metricsAllowlistConfigMap == nil {
-		var err error
-		if metricsAllowlistConfigMap, err = generateMetricsListCM(c); err != nil {
-			return nil, nil, nil, err
-		}
-	}
-	works = injectIntoWork(works, metricsAllowlistConfigMap)
-
 	// inject the alertmanager accessor bearer token secret
 	if amAccessorTokenSecret == nil {
 		var err error
@@ -365,6 +357,19 @@ func createManifestWorks(c client.Client, restMapper meta.RESTMapper,
 	hubInfo.Data[operatorconfig.ClusterNameKey] = []byte(clusterName)
 	manifests = injectIntoWork(manifests, hubInfo)
 
+	// inject the metrics allowlist configmap
+	if metricsAllowlistConfigMap == nil {
+		var err error
+		if metricsAllowlistConfigMap, err = generateMetricsListCM(c); err != nil {
+			return err
+		}
+	}
+	mcMetricsAllowlistConfigMap, err := getClusterMetricsAllowList(c, clusterNamespace)
+	if err != nil {
+		return err
+	}
+	manifests = injectIntoWork(manifests, mcMetricsAllowlistConfigMap)
+
 	work.Spec.Workload.Manifests = manifests
 
 	err = createManifestwork(c, work)
@@ -475,7 +480,7 @@ func generateObservabilityServerCACerts(client client.Client) (*corev1.Secret, e
 
 // generateMetricsListCM generates the configmap that contains the metrics allowlist
 func generateMetricsListCM(client client.Client) (*corev1.ConfigMap, error) {
-	metricsAllowlist := &corev1.ConfigMap{
+	metricsAllowlistCM := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.String(),
 			Kind:       "ConfigMap",
@@ -487,13 +492,13 @@ func generateMetricsListCM(client client.Client) (*corev1.ConfigMap, error) {
 		Data: map[string]string{},
 	}
 
-	allowlist, err := getAllowList(client, operatorconfig.AllowlistConfigMapName)
+	allowlist, err := getAllowList(client, operatorconfig.AllowlistConfigMapName, config.GetDefaultNamespace())
 	if err != nil {
 		log.Error(err, "Failed to get metrics allowlist configmap "+operatorconfig.AllowlistConfigMapName)
 		return nil, err
 	}
 
-	customAllowlist, err := getAllowList(client, config.AllowlistCustomConfigMapName)
+	customAllowlist, err := getAllowList(client, config.AllowlistCustomConfigMapName, config.GetDefaultNamespace())
 	if err == nil {
 		allowlist.NameList = mergeMetrics(allowlist.NameList, customAllowlist.NameList)
 		allowlist.MatchList = mergeMetrics(allowlist.MatchList, customAllowlist.MatchList)
@@ -505,20 +510,21 @@ func generateMetricsListCM(client client.Client) (*corev1.ConfigMap, error) {
 		log.Info("There is no custom metrics allowlist configmap in the cluster")
 	}
 
-	data, err := yaml.Marshal(allowlist)
+	metricsAllowlist = allowlist
+	data, err := yaml.Marshal(metricsAllowlist)
 	if err != nil {
 		log.Error(err, "Failed to marshal allowlist data")
 		return nil, err
 	}
-	metricsAllowlist.Data["metrics_list.yaml"] = string(data)
-	return metricsAllowlist, nil
+	metricsAllowlistCM.Data["metrics_list.yaml"] = string(data)
+	return metricsAllowlistCM, nil
 }
 
-func getAllowList(client client.Client, name string) (*MetricsAllowlist, error) {
+func getAllowList(client client.Client, name string, namespace string) (*MetricsAllowlist, error) {
 	found := &corev1.ConfigMap{}
 	namespacedName := types.NamespacedName{
 		Name:      name,
-		Namespace: config.GetDefaultNamespace(),
+		Namespace: namespace,
 	}
 	err := client.Get(context.TODO(), namespacedName, found)
 	if err != nil {
@@ -624,4 +630,48 @@ func removeObservabilityAddon(client client.Client, namespace string) error {
 		}
 	}
 	return nil
+}
+
+func getClusterMetricsAllowList(client client.Client, namespace string) (*corev1.ConfigMap, error) {
+	allowlist, err := getAllowList(client, operatorconfig.AllowlistConfigMapName, namespace)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return metricsAllowlistConfigMap, nil
+		} else {
+			return nil, err
+		}
+	}
+	log.Info("There is custom metrics allowlist configmap for managed cluster", "cluster", namespace)
+
+	allowlist.NameList = mergeMetrics(allowlist.NameList, metricsAllowlist.NameList)
+	allowlist.MatchList = mergeMetrics(allowlist.MatchList, metricsAllowlist.MatchList)
+	if allowlist.RuleList == nil {
+		allowlist.RuleList = []Rule{}
+	}
+	allowlist.RuleList = append(allowlist.RuleList, metricsAllowlist.RuleList...)
+	if allowlist.ReNameMap == nil {
+		allowlist.ReNameMap = map[string]string{}
+	}
+	for k, v := range metricsAllowlist.ReNameMap {
+		allowlist.ReNameMap[k] = v
+	}
+
+	data, err := yaml.Marshal(allowlist)
+	if err != nil {
+		log.Error(err, "Failed to marshal allowlist data", "cluster", namespace)
+		return nil, err
+	}
+	metricsAllowlist := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      operatorconfig.AllowlistConfigMapName,
+			Namespace: spokeNameSpace,
+		},
+		Data: map[string]string{},
+	}
+	metricsAllowlist.Data["metrics_list.yaml"] = string(data)
+	return metricsAllowlist, nil
 }
