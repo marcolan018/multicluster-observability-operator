@@ -790,7 +790,7 @@ data:
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum(container_memory_rss{cluster=\"$cluster\", container!=\"\"}) by (namespace)",
+              "expr": "namespace:container_memory_rss:sum{cluster=\"$cluster\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -1208,7 +1208,7 @@ data:
           "pluginVersion": "7.4.2",
           "targets": [
             {
-              "expr": "sum(container_memory_rss{cluster=\"$cluster\", container!=\"\"}) by (namespace) / sum(kube_pod_container_resource_requests{cluster=\"$cluster\", resource=\"memory\"}) by (namespace)",
+              "expr": "namespace:container_memory_rss:sum{cluster=\"$cluster\"} / sum(kube_pod_container_resource_requests{cluster=\"$cluster\", resource=\"memory\"}) by (namespace)",
               "format": "table",
               "instant": true,
               "interval": "",
@@ -1218,7 +1218,7 @@ data:
               "step": 10
             },
             {
-              "expr": "sum(container_memory_rss{cluster=\"$cluster\", container!=\"\"}) by (namespace)",
+              "expr": "namespace:container_memory_rss:sum{cluster=\"$cluster\"}",
               "format": "table",
               "instant": true,
               "intervalFactor": 2,
@@ -1227,7 +1227,7 @@ data:
               "step": 10
             },
             {
-              "expr": "sum(kube_pod_container_resource_requests{cluster=\"$cluster\", resource=\"memory\"}) by (namespace)",
+              "expr": "namespace_memory:kube_pod_container_resource_requests:sum{cluster=\"$cluster\"}",
               "format": "table",
               "instant": true,
               "interval": "",

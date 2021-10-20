@@ -57,7 +57,7 @@ type Alert struct {
 	Labels map[string]string `json:"labels"`
 }
 
-func StartMetricsRuleWatcher(c client.Client) {
+func StartMetricsRuleWatcher(c client.Client) context.CancelFunc {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		for {
@@ -70,7 +70,7 @@ func StartMetricsRuleWatcher(c client.Client) {
 			}
 		}
 	}()
-	cancel()
+	return cancel
 }
 
 func checkMetricsRule(c client.Client) {

@@ -57,7 +57,7 @@ data:
           record: cluster:memory_requested:ratio
           labels:
             usage: grafana-dashboard
-        - expr: 1 - sum(:node_memory_MemAvailable_bytes:sum) by (cluster) / sum(kube_node_status_allocatable{resource="memory"}) by (cluster)
+        - expr: 1 - sum(:node_memory_MemAvailable_bytes:sum) by (cluster) / sum(kube_node_status_capacity{resource="memory"}) by (cluster)
           record: cluster:memory_utilized:ratio
           labels:
             usage: grafana-dashboard
