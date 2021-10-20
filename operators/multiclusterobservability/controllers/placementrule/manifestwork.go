@@ -56,16 +56,23 @@ var (
 )
 
 type MetricsAllowlist struct {
-	NameList  []string          `yaml:"names"`
-	MatchList []string          `yaml:"matches"`
-	ReNameMap map[string]string `yaml:"renames"`
-	RuleList  []Rule            `yaml:"rules"`
+	NameList        []string          `yaml:"names"`
+	MatchList       []string          `yaml:"matches"`
+	ReNameMap       map[string]string `yaml:"renames"`
+	RuleList        []Rule            `yaml:"rules"`
+	MetricsRuleList []MetricsRule     `yaml:"metrics_rules"`
 }
 
 // Rule is the struct for recording rules and alert rules
 type Rule struct {
 	Record string `yaml:"record"`
 	Expr   string `yaml:"expr"`
+}
+
+type MetricsRule struct {
+	Name        string   `yaml:"name"`
+	Expr        string   `yaml:"expr"`
+	MetricsList []string `yaml:"metrics_list"`
 }
 
 func deleteManifestWork(c client.Client, name string, namespace string) error {
