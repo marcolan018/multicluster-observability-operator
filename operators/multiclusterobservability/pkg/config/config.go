@@ -982,7 +982,7 @@ func GetOBAResources(oba *mcoshared.ObservabilityAddonSpec) *corev1.ResourceRequ
 }
 
 func GetOperandName(name string) string {
-	log.V(1).Info("operand is", "key", name, "name", operandNames[name])
+	//log.V(1).Info("operand is", "key", name, "name", operandNames[name])
 	return operandNames[name]
 }
 

@@ -640,7 +640,7 @@ func removeObservabilityAddon(client client.Client, namespace string) error {
 }
 
 func getClusterMetricsAllowList(client client.Client, namespace string) (*corev1.ConfigMap, error) {
-	allowlist, err := getAllowList(client, operatorconfig.AllowlistConfigMapName, namespace)
+	allowlist, err := getAllowList(client, config.AllowlistCustomConfigMapName, namespace)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return metricsAllowlistConfigMap, nil

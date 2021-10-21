@@ -172,7 +172,7 @@ data:
         expr: sum(container_memory_rss{container!=\"\"}) by (namespace)
     metrics_rules:
       - name: HighMemoryUsage
-        expr: cluster:memory_utilized:ratio * 100 > 15
+        expr: cluster:memory_requested:ratio * 100 > 80
         metrics_list:
           - container_memory_cache
           - container_memory_rss

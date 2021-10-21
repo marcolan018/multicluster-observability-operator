@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/open-cluster-management/multicluster-observability-operator/operators/multiclusterobservability/pkg/config"
-	operatorconfig "github.com/open-cluster-management/multicluster-observability-operator/operators/pkg/config"
 )
 
 const (
@@ -29,6 +28,7 @@ const (
 )
 
 var (
+	started      = false
 	firingAlerts = map[string]map[string]string{}
 )
 
@@ -58,6 +58,9 @@ type Alert struct {
 }
 
 func StartMetricsRuleWatcher(c client.Client) context.CancelFunc {
+	if started {
+		return nil
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		for {
@@ -65,11 +68,13 @@ func StartMetricsRuleWatcher(c client.Client) context.CancelFunc {
 			select {
 			case <-ctx.Done():
 				log.Info("metrics rule watcher goroutine is stopped.")
+				started = false
 				return
 			case <-time.After(30 * time.Second):
 			}
 		}
 	}()
+	started = true
 	return cancel
 }
 
@@ -99,15 +104,11 @@ func checkMetricsRule(c client.Client) {
 			log.Error(err, "Failed to unmarshall the response")
 			return
 		}
-		log.Info("alert result", "status", result.Status)
 		for _, group := range result.Data.Groups {
-			log.Info("group", "name", group.Name)
 			if group.Name == MetricsRuleGroup {
 				for _, rule := range group.Rules {
-					log.Info("rule", "name", rule.Name, "state", rule.State)
 					if rule.State == "firing" {
 						for _, alert := range rule.Alerts {
-							log.Info("alert", "state", alert.State, "labels", alert.Labels)
 							if alert.State == "firing" {
 								update := true
 								if firingAlerts[group.Name] == nil {
@@ -149,7 +150,7 @@ func updateClusterAllowlist(c client.Client, cluster string, rule string) {
 	found := &corev1.ConfigMap{}
 	err := c.Get(context.TODO(), types.NamespacedName{
 		Namespace: cluster,
-		Name:      operatorconfig.AllowlistConfigMapName,
+		Name:      config.AllowlistCustomConfigMapName,
 	}, found)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
@@ -159,8 +160,11 @@ func updateClusterAllowlist(c client.Client, cluster string, rule string) {
 					Kind:       "ConfigMap",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      operatorconfig.AllowlistConfigMapName,
+					Name:      config.AllowlistCustomConfigMapName,
 					Namespace: cluster,
+					Labels: map[string]string{
+						"acm-observability": "true",
+					},
 				},
 				Data: map[string]string{},
 			}
