@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
+	"github.com/open-cluster-management/multicluster-observability-operator/collectors/metrics/pkg/collectrule"
 	"github.com/open-cluster-management/multicluster-observability-operator/collectors/metrics/pkg/forwarder"
 	collectorhttp "github.com/open-cluster-management/multicluster-observability-operator/collectors/metrics/pkg/http"
 	"github.com/open-cluster-management/multicluster-observability-operator/collectors/metrics/pkg/logger"
@@ -30,11 +31,12 @@ import (
 
 func main() {
 	opt := &Options{
-		Listen:     "localhost:9002",
-		LimitBytes: 200 * 1024,
-		Rules:      []string{`{__name__="up"}`},
-		Interval:   4*time.Minute + 30*time.Second,
-		WorkerNum:  1,
+		Listen:           "localhost:9002",
+		LimitBytes:       200 * 1024,
+		Rules:            []string{`{__name__="up"}`},
+		Interval:         5 * time.Minute,
+		EvaluateInterval: 1 * time.Minute,
+		WorkerNum:        1,
 	}
 	cmd := &cobra.Command{
 		Short:         "Federate Prometheus via push",
@@ -53,12 +55,14 @@ func main() {
 	cmd.Flags().StringVar(&opt.FromTokenFile, "from-token-file", opt.FromTokenFile, "A file containing a bearer token to use when authenticating to the source Prometheus server.")
 	cmd.Flags().StringVar(&opt.ToUpload, "to-upload", opt.ToUpload, "A server endpoint to push metrics to.")
 	cmd.Flags().DurationVar(&opt.Interval, "interval", opt.Interval, "The interval between scrapes. Prometheus returns the last 5 minutes of metrics when invoking the federation endpoint.")
+	cmd.Flags().DurationVar(&opt.EvaluateInterval, "evaluate-interval", opt.EvaluateInterval, "The interval between collect rule evaluation.")
 	cmd.Flags().Int64Var(&opt.LimitBytes, "limit-bytes", opt.LimitBytes, "The maxiumum acceptable size of a response returned when scraping Prometheus.")
 
 	// TODO: more complex input definition, such as a JSON struct
 	cmd.Flags().StringArrayVar(&opt.Rules, "match", opt.Rules, "Match rules to federate.")
 	cmd.Flags().StringArrayVar(&opt.RecordingRules, "recordingrule", opt.RecordingRules, "Define recording rule is to generate new metrics based on specified query expression.")
 	cmd.Flags().StringVar(&opt.RulesFile, "match-file", opt.RulesFile, "A file containing match rules to federate, one rule per line.")
+	cmd.Flags().StringArrayVar(&opt.CollectRules, "collectrule", opt.CollectRules, "Define metrics collect rule is to collect additional metrics based on specified event.")
 
 	cmd.Flags().StringSliceVar(&opt.LabelFlag, "label", opt.LabelFlag, "Labels to add to each outgoing metric, in key=value form.")
 	cmd.Flags().StringSliceVar(&opt.RenameFlag, "rename", opt.RenameFlag, "Rename metrics before sending by specifying OLD=NEW name pairs.")
@@ -118,12 +122,14 @@ type Options struct {
 
 	Rules          []string
 	RecordingRules []string
+	CollectRules   []string
 	RulesFile      string
 
 	LabelFlag []string
 	Labels    map[string]string
 
-	Interval time.Duration
+	Interval         time.Duration
+	EvaluateInterval time.Duration
 
 	LogLevel string
 	Logger   log.Logger
@@ -222,6 +228,20 @@ func (o *Options) Run() error {
 	err = runMultiWorkers(o)
 	if err != nil {
 		return err
+	}
+
+	if len(o.CollectRules) != 0 {
+		evaluator, err := collectrule.New(*cfg)
+		if err != nil {
+			return fmt.Errorf("failed to configure collect rule evaluator: %v", err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		g.Add(func() error {
+			evaluator.Run(ctx)
+			return nil
+		}, func(error) {
+			cancel()
+		})
 	}
 
 	return g.Run()
@@ -366,9 +386,11 @@ func initConfig(o *Options) (error, *forwarder.Config) {
 		AnonymizeSaltFile: o.AnonymizeSaltFile,
 		Debug:             o.Verbose,
 		Interval:          o.Interval,
+		EvaluateInterval:  o.EvaluateInterval,
 		LimitBytes:        o.LimitBytes,
 		Rules:             o.Rules,
 		RecordingRules:    o.RecordingRules,
+		CollectRules:      o.CollectRules,
 		RulesFile:         o.RulesFile,
 		Transformer:       transformer,
 
