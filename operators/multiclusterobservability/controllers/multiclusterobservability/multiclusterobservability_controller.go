@@ -126,9 +126,6 @@ func (r *MultiClusterObservabilityReconciler) Reconcile(ctx context.Context, req
 
 		// start servicemonitor controller
 		smctrl.Start()
-
-		// start metrics rule watcher
-		placementctrl.StartMetricsRuleWatcher(r.Client)
 	}
 
 	// Init finalizers

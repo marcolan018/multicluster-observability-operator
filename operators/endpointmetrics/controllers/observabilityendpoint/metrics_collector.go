@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -45,16 +46,24 @@ var (
 )
 
 type MetricsAllowlist struct {
-	NameList  []string          `yaml:"names"`
-	MatchList []string          `yaml:"matches"`
-	ReNameMap map[string]string `yaml:"renames"`
-	RuleList  []Rule            `yaml:"rules"`
+	NameList        []string          `yaml:"names"`
+	MatchList       []string          `yaml:"matches"`
+	ReNameMap       map[string]string `yaml:"renames"`
+	RuleList        []Rule            `yaml:"rules"`
+	MetricsRuleList []MetricsRule     `yaml:"metrics_rules"`
 }
 
 // Rule is the struct for recording rules and alert rules
 type Rule struct {
 	Record string `yaml:"record"`
 	Expr   string `yaml:"expr"`
+}
+
+type MetricsRule struct {
+	Name        string   `yaml:"name"`
+	Expr        string   `yaml:"expr"`
+	Duration    string   `yaml:"for"`
+	MetricsList []string `yaml:"metrics_list"`
 }
 
 func createDeployment(clusterID string, clusterType string,
@@ -144,6 +153,11 @@ func createDeployment(clusterID string, clusterType string,
 	}
 	for _, rule := range allowlist.RuleList {
 		commands = append(commands, fmt.Sprintf("--recordingrule={\"name\":\"%s\",\"query\":\"%s\"}", rule.Record, rule.Expr))
+	}
+	for _, metrics_rule := range allowlist.MetricsRuleList {
+		commands = append(commands, fmt.Sprintf("--collectrule={\"name\":\"%s\",\"expr\":\"%s\",\"for\":\"%s\",\"metrics_list\":[\"%s\"]}",
+			metrics_rule.Name, metrics_rule.Expr, metrics_rule.Duration,
+			strings.Join(metrics_rule.MetricsList, "\",\"")))
 	}
 	from := promURL
 	if !installPrometheus {

@@ -72,6 +72,7 @@ type Rule struct {
 type MetricsRule struct {
 	Name        string   `yaml:"name"`
 	Expr        string   `yaml:"expr"`
+	Duration    string   `yaml:"for"`
 	MetricsList []string `yaml:"metrics_list"`
 }
 
