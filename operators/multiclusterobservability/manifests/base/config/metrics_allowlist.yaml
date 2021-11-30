@@ -168,14 +168,3 @@ data:
         expr: sum(sum(sum(kube_pod_container_resource_requests{resource=\"memory\"}) by (pod,namespace,container) * on(pod,namespace) group_left(phase) max(kube_pod_status_phase{phase=~\"Running|Pending|Unknown\"} >0) by (pod,namespace,phase)) by (pod,namespace,phase))
       - record: sli:apiserver_request_duration_seconds:trend:1m
         expr: sum(increase(apiserver_request_duration_seconds_bucket{apiserver=\"kube-apiserver\",le=\"1\",verb=~\"POST|PUT|DELETE|PATCH\"}[1m])) / sum(increase(apiserver_request_duration_seconds_count{apiserver=\"kube-apiserver\",verb=~\"POST|PUT|DELETE|PATCH\"}[1m]))
-    metrics_rules:
-      - name: HighMemoryUsage
-        expr: cluster:memory_usage:ratio * 100 > 50
-        for: 2m
-        metrics_list:
-          - container_memory_cache
-          - container_memory_rss
-          - container_memory_swap
-          - container_memory_working_set_bytes    
-          - kube_pod_container_resource_limits
-          - kube_pod_container_resource_requests

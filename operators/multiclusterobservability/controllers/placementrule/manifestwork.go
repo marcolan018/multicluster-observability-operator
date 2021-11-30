@@ -511,6 +511,7 @@ func generateMetricsListCM(client client.Client) (*corev1.ConfigMap, error) {
 		allowlist.NameList = mergeMetrics(allowlist.NameList, customAllowlist.NameList)
 		allowlist.MatchList = mergeMetrics(allowlist.MatchList, customAllowlist.MatchList)
 		allowlist.RuleList = append(allowlist.RuleList, customAllowlist.RuleList...)
+		allowlist.MetricsRuleList = append(allowlist.MetricsRuleList, customAllowlist.MetricsRuleList...)
 		for k, v := range customAllowlist.ReNameMap {
 			allowlist.ReNameMap[k] = v
 		}
